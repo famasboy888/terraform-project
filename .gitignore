@@ -35,3 +35,4 @@ terraform.rc
 
 # Added by kyley
 *.json
+*.pem

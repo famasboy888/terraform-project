@@ -2,3 +2,98 @@
 #Provider: OpenStack
 #Date: Mar 27, 2024
 
+# Create Instance AMI Flavor
+resource "openstack_compute_flavor_v2" "instance-flavor" {
+  name  = var.flavor_name
+  ram   = "4096"
+  vcpus = "4"
+  disk  = "5"
+  swap = "2048"
+  is_public = true
+}
+
+# Create Public Network
+resource "openstack_networking_network_v2" "external-network" {
+  name = var.network_external_name
+  segments {
+    network_type     = "flat"
+    physical_network = var.network_external_physical_name
+  }
+  shared         = "true"
+  admin_state_up = "true"
+  external       = "true"
+}
+
+# Subnet creation for External Network
+resource "openstack_networking_subnet_v2" "ext-subnet" {
+  name       = var.network_external_subnet_name
+  network_id = "${openstack_networking_network_v2.external-network.id}"
+  cidr       = local.secret_data.ext_subn_cidr
+  ip_version = 4
+  enable_dhcp = "true"
+  gateway_ip  = local.secret_data.ext_gateway_ip
+  allocation_pool {
+    end   = local.secret_data.ext_subn_alloc_end
+    start = local.secret_data.ext_subn_alloc_start
+  }
+  dns_nameservers = ["8.8.8.8","1.1.1.1"]
+}
+
+# Create Master Node
+resource "openstack_compute_instance_v2" "master" {
+  name            = "master"
+  image_id        = var.image_id
+  flavor_id       = openstack_compute_flavor_v2.instance-flavor.id
+  key_pair        = var.key_pair
+  security_groups = ["${var.security_groups}"]
+
+  network {
+    name = openstack_networking_network_v2.external-network.name
+  }
+
+
+  provisioner "local-exec" {
+    command = "echo 'Waiting for SSH to be ready"
+
+    connection {
+      type        = "ssh"
+      user        = var.instance_username
+      private_key = file("${path.module}/key_pair1.pem")
+      host        = openstack_compute_instance_v2.master.access_ip_v4
+    }
+  }
+
+  provisioner "local-exec" {
+    command = "echo Success SSH!"
+  }
+}
+
+# Create Master Node
+resource "openstack_compute_instance_v2" "worker" {
+  name            = "worker-${count.index+1}"
+  image_id        = var.image_id
+  flavor_id       = openstack_compute_flavor_v2.instance-flavor.id
+  key_pair        = var.key_pair
+  security_groups = ["${var.security_groups}"]
+  count = var.instance_worker_count
+
+  network {
+    name = openstack_networking_network_v2.external-network.name
+  }
+
+
+  provisioner "local-exec" {
+    command = "echo 'Waiting for SSH to be ready"
+
+    connection {
+      type        = "ssh"
+      user        = var.instance_username
+      private_key = file("${path.module}/key_pair1.pem")
+      host        = openstack_compute_instance_v2.master.access_ip_v4
+    }
+  }
+
+  provisioner "local-exec" {
+    command = "echo Success SSH!"
+  }
+}
