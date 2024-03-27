@@ -36,3 +36,4 @@ terraform.rc
 # Added by kyley
 *.json
 *.pem
+.terraform.lock.hcl
