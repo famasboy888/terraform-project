@@ -68,7 +68,7 @@ resource "openstack_compute_instance_v2" "master" {
   }
 }
 
-# Create Master Node
+# Create Worker Node
 resource "openstack_compute_instance_v2" "worker" {
   name            = "worker-${count.index+1}"
   image_id        = var.image_id
